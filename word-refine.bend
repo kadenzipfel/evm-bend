@@ -4,6 +4,7 @@
 
 import Base
 import ./word-spec.bend as Spec
+import ./evmword.bend as L
 
 # --- Lemma 1: the carry out of a full adder, as a Bool ---------------------
 # Base's Bool.full_add returns (sum, carry) as a pair. Projecting the second
@@ -412,3 +413,312 @@ def adc_out_zero_right(n, u):
 #     adc_is_add_carry and adc_out_split specialise to L.carry directly;
 #   - instantiate concat_adc seven times over of_limbs' nesting and discard the
 #     256th carry, which is step 5 and is mechanical.
+
+# --- Lemma 4b: carry composition -------------------------------------------
+# A two-step addition cannot overflow twice:
+#   carry(x+y+c) == carry(x+y) OR carry((x+y)+c)
+# which is exactly the shape evmword.carry decides with its two U32.is_lt tests.
+#
+# A direct induction fails: the second carry chain runs over the bits of
+# add(x,y), not over x and y. The fix is to carry BOTH chains at once, indexed
+# by the only three carry states reachable together -- the invariant being
+# a = b or g, and never both b and g.
+
+type CarryPair is Data:
+  Neither{}
+  Base{}
+  Bump{}
+
+def pa(p: CarryPair) -> Bool:
+  match p:
+    case Neither{}: False{}
+    case Base{}: True{}
+    case Bump{}: True{}
+
+def pb(p: CarryPair) -> Bool:
+  match p:
+    case Neither{}: False{}
+    case Base{}: True{}
+    case Bump{}: False{}
+
+def pg(p: CarryPair) -> Bool:
+  match p:
+    case Neither{}: False{}
+    case Base{}: False{}
+    case Bump{}: True{}
+
+# How the joint carry state advances over one bit. Bump can fall back to
+# Neither or promote to Base; the invariant is preserved throughout.
+def pstep(p: CarryPair, x0: Bool, y0: Bool) -> CarryPair:
+  match p x0 y0:
+    case Neither{} False{} False{}: Neither{}
+    case Neither{} False{} True{}: Neither{}
+    case Neither{} True{} False{}: Neither{}
+    case Neither{} True{} True{}: Base{}
+    case Base{} False{} False{}: Neither{}
+    case Base{} False{} True{}: Base{}
+    case Base{} True{} False{}: Base{}
+    case Base{} True{} True{}: Base{}
+    case Bump{} False{} False{}: Neither{}
+    case Bump{} False{} True{}: Bump{}
+    case Bump{} True{} False{}: Bump{}
+    case Bump{} True{} True{}: Base{}
+
+law adc_out_split_go:
+  for +q: Nat
+  for +x: Word(q)
+  for +y: Word(q)
+  for p: CarryPair
+  {adc_out(q,x,y,False{},pa(p))
+    == Bool.or(adc_out(q,x,y,False{},pb(p)),
+               adc_out(q, Word.adc(q,x,y,False{},pb(p)), Word.zero(q), False{}, pg(p)))
+    : Bool}
+def adc_out_split_go(q, x, y, p):
+  match q:
+    case 0n:
+      match x y p:
+        case WNil{} WNil{} Neither{}: {==}
+        case WNil{} WNil{} Base{}: {==}
+        case WNil{} WNil{} Bump{}: {==}
+    case 1n+q2:
+      match x y p:
+        case WCon{False{},+xt} WCon{False{},+yt} Neither{}:
+          adc_out_split_go(q2, xt, yt, Neither{})
+        case WCon{False{},+xt} WCon{True{},+yt} Neither{}:
+          adc_out_split_go(q2, xt, yt, Neither{})
+        case WCon{True{},+xt} WCon{False{},+yt} Neither{}:
+          adc_out_split_go(q2, xt, yt, Neither{})
+        case WCon{True{},+xt} WCon{True{},+yt} Neither{}:
+          adc_out_split_go(q2, xt, yt, Base{})
+        case WCon{False{},+xt} WCon{False{},+yt} Base{}:
+          adc_out_split_go(q2, xt, yt, Neither{})
+        case WCon{False{},+xt} WCon{True{},+yt} Base{}:
+          adc_out_split_go(q2, xt, yt, Base{})
+        case WCon{True{},+xt} WCon{False{},+yt} Base{}:
+          adc_out_split_go(q2, xt, yt, Base{})
+        case WCon{True{},+xt} WCon{True{},+yt} Base{}:
+          adc_out_split_go(q2, xt, yt, Base{})
+        case WCon{False{},+xt} WCon{False{},+yt} Bump{}:
+          adc_out_split_go(q2, xt, yt, Neither{})
+        case WCon{False{},+xt} WCon{True{},+yt} Bump{}:
+          adc_out_split_go(q2, xt, yt, Bump{})
+        case WCon{True{},+xt} WCon{False{},+yt} Bump{}:
+          adc_out_split_go(q2, xt, yt, Bump{})
+        case WCon{True{},+xt} WCon{True{},+yt} Bump{}:
+          adc_out_split_go(q2, xt, yt, Base{})
+
+# At a nonzero width, "increment by c" can be written either as a carry-in over
+# a zero word or as adding the word that is c in bit 0. Both put AND(s0,c) into
+# the tail's carry, so they agree.
+law zero_vs_carry_word:
+  for +n: Nat
+  for +s: Word(1n+n)
+  for c: Bool
+  {adc_out(1n+n, s, Word.zero(1n+n), False{}, c)
+    == adc_out(1n+n, s, carry_word(1n+n,c), False{}, False{}) : Bool}
+def zero_vs_carry_word(n, s, c):
+  match s:
+    case WCon{s0, st}:
+      match s0 c:
+        case False{} False{}: {==}
+        case False{} True{}: {==}
+        case True{} False{}: {==}
+        case True{} True{}: {==}
+
+# Lemma 4b. Stated at width 1n+n: at width zero it is false, since a 0-bit
+# add(x,y) cannot represent the carry the increment would have produced.
+law adc_out_split:
+  for +n: Nat
+  for +x: Word(1n+n)
+  for +y: Word(1n+n)
+  for c: Bool
+  {adc_out(1n+n,x,y,False{},c)
+    == Bool.or(adc_out(1n+n,x,y,False{},False{}),
+               adc_out(1n+n, Word.add(1n+n,x,y), carry_word(1n+n,c), False{}, False{}))
+    : Bool}
+def adc_out_split(n, x, y, c):
+  match c:
+    case False{}:
+      Equal.trans(Bool,
+        adc_out(1n+n,x,y,False{},False{}),
+        Bool.or(adc_out(1n+n,x,y,False{},False{}),
+          adc_out(1n+n, Word.adc(1n+n,x,y,False{},False{}), Word.zero(1n+n), False{}, False{})),
+        Bool.or(adc_out(1n+n,x,y,False{},False{}),
+          adc_out(1n+n, Word.adc(1n+n,x,y,False{},False{}), carry_word(1n+n,False{}), False{}, False{})),
+        adc_out_split_go(1n+n, x, y, Neither{}),
+        Equal.cong(Bool, Bool,
+          w => Bool.or(adc_out(1n+n,x,y,False{},False{}), w),
+          adc_out(1n+n, Word.adc(1n+n,x,y,False{},False{}), Word.zero(1n+n), False{}, False{}),
+          adc_out(1n+n, Word.adc(1n+n,x,y,False{},False{}), carry_word(1n+n,False{}), False{}, False{}),
+          zero_vs_carry_word(n, Word.adc(1n+n,x,y,False{},False{}), False{})))
+    case True{}:
+      Equal.trans(Bool,
+        adc_out(1n+n,x,y,False{},True{}),
+        Bool.or(adc_out(1n+n,x,y,False{},False{}),
+          adc_out(1n+n, Word.adc(1n+n,x,y,False{},False{}), Word.zero(1n+n), False{}, True{})),
+        Bool.or(adc_out(1n+n,x,y,False{},False{}),
+          adc_out(1n+n, Word.adc(1n+n,x,y,False{},False{}), carry_word(1n+n,True{}), False{}, False{})),
+        adc_out_split_go(1n+n, x, y, Bump{}),
+        Equal.cong(Bool, Bool,
+          w => Bool.or(adc_out(1n+n,x,y,False{},False{}), w),
+          adc_out(1n+n, Word.adc(1n+n,x,y,False{},False{}), Word.zero(1n+n), False{}, True{}),
+          adc_out(1n+n, Word.adc(1n+n,x,y,False{},False{}), carry_word(1n+n,True{}), False{}, False{}),
+          zero_vs_carry_word(n, Word.adc(1n+n,x,y,False{},False{}), True{})))
+
+# --- The bridge: evmword.carry IS the bitvector carry out -------------------
+# L.carry decides a limb carry with two U32.is_lt tests. Lemma 4a turns each
+# test into an adc_out, and lemma 4b joins them. U32.add is U32{Word.add(32n,·,·)}
+# and U32.cmp is Word.cmp(32n,·,·) by definition, so the two sides meet.
+
+law carry_is_adc_out:
+  for +xa: Word(32n)
+  for +ya: Word(32n)
+  for c: Bool
+  {L.carry(U32{xa}, U32{ya}, L.bit(c))
+    == L.bit(adc_out(32n, xa, ya, False{}, c)) : U32}
+def carry_is_adc_out(xa, ya, c):
+  match c:
+    case False{}:
+      Equal.cong(Bool, U32, w => L.bit(w),
+        Bool.or(Cmp.is_lt(Word.cmp(32n, Word.add(32n,xa,ya), xa)),
+                Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+                                        Word.add(32n,xa,ya)))),
+        adc_out(32n, xa, ya, False{}, False{}),
+        Equal.trans(Bool,
+          Bool.or(Cmp.is_lt(Word.cmp(32n, Word.add(32n,xa,ya), xa)),
+                  Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+                                          Word.add(32n,xa,ya)))),
+          Bool.or(adc_out(32n,xa,ya,False{},False{}),
+                  Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+                                          Word.add(32n,xa,ya)))),
+          adc_out(32n, xa, ya, False{}, False{}),
+          Equal.cong(Bool, Bool,
+            w => Bool.or(w, Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+                                                    Word.add(32n,xa,ya)))),
+            Cmp.is_lt(Word.cmp(32n, Word.add(32n,xa,ya), xa)),
+            adc_out(32n,xa,ya,False{},False{}),
+            Equal.sym(Bool, adc_out(32n,xa,ya,False{},False{}),
+              Cmp.is_lt(Word.cmp(32n, Word.add(32n,xa,ya), xa)),
+              adc_out_is_cmp(32n, xa, ya, False{}))),
+          Equal.trans(Bool,
+            Bool.or(adc_out(32n,xa,ya,False{},False{}),
+                    Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+                                            Word.add(32n,xa,ya)))),
+            Bool.or(adc_out(32n,xa,ya,False{},False{}),
+                    adc_out(32n, Word.add(32n,xa,ya), carry_word(32n,False{}), False{}, False{})),
+            adc_out(32n, xa, ya, False{}, False{}),
+            Equal.cong(Bool, Bool,
+              w => Bool.or(adc_out(32n,xa,ya,False{},False{}), w),
+              Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+                                      Word.add(32n,xa,ya))),
+              adc_out(32n, Word.add(32n,xa,ya), carry_word(32n,False{}), False{}, False{}),
+              Equal.sym(Bool,
+                adc_out(32n, Word.add(32n,xa,ya), carry_word(32n,False{}), False{}, False{}),
+                Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+                                        Word.add(32n,xa,ya))),
+                adc_out_is_cmp(32n, Word.add(32n,xa,ya), carry_word(32n,False{}), False{}))),
+            Equal.sym(Bool,
+              adc_out(32n, xa, ya, False{}, False{}),
+              Bool.or(adc_out(32n,xa,ya,False{},False{}),
+                      adc_out(32n, Word.add(32n,xa,ya), carry_word(32n,False{}), False{}, False{})),
+              adc_out_split(31n, xa, ya, False{})))))
+    case True{}:
+      Equal.cong(Bool, U32, w => L.bit(w),
+        Bool.or(Cmp.is_lt(Word.cmp(32n, Word.add(32n,xa,ya), xa)),
+                Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+                                        Word.add(32n,xa,ya)))),
+        adc_out(32n, xa, ya, False{}, True{}),
+        Equal.trans(Bool,
+          Bool.or(Cmp.is_lt(Word.cmp(32n, Word.add(32n,xa,ya), xa)),
+                  Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+                                          Word.add(32n,xa,ya)))),
+          Bool.or(adc_out(32n,xa,ya,False{},False{}),
+                  Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+                                          Word.add(32n,xa,ya)))),
+          adc_out(32n, xa, ya, False{}, True{}),
+          Equal.cong(Bool, Bool,
+            w => Bool.or(w, Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+                                                    Word.add(32n,xa,ya)))),
+            Cmp.is_lt(Word.cmp(32n, Word.add(32n,xa,ya), xa)),
+            adc_out(32n,xa,ya,False{},False{}),
+            Equal.sym(Bool, adc_out(32n,xa,ya,False{},False{}),
+              Cmp.is_lt(Word.cmp(32n, Word.add(32n,xa,ya), xa)),
+              adc_out_is_cmp(32n, xa, ya, False{}))),
+          Equal.trans(Bool,
+            Bool.or(adc_out(32n,xa,ya,False{},False{}),
+                    Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+                                            Word.add(32n,xa,ya)))),
+            Bool.or(adc_out(32n,xa,ya,False{},False{}),
+                    adc_out(32n, Word.add(32n,xa,ya), carry_word(32n,True{}), False{}, False{})),
+            adc_out(32n, xa, ya, False{}, True{}),
+            Equal.cong(Bool, Bool,
+              w => Bool.or(adc_out(32n,xa,ya,False{},False{}), w),
+              Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+                                      Word.add(32n,xa,ya))),
+              adc_out(32n, Word.add(32n,xa,ya), carry_word(32n,True{}), False{}, False{}),
+              Equal.sym(Bool,
+                adc_out(32n, Word.add(32n,xa,ya), carry_word(32n,True{}), False{}, False{}),
+                Cmp.is_lt(Word.cmp(32n, Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+                                        Word.add(32n,xa,ya))),
+                adc_out_is_cmp(32n, Word.add(32n,xa,ya), carry_word(32n,True{}), False{}))),
+            Equal.sym(Bool,
+              adc_out(32n, xa, ya, False{}, True{}),
+              Bool.or(adc_out(32n,xa,ya,False{},False{}),
+                      adc_out(32n, Word.add(32n,xa,ya), carry_word(32n,True{}), False{}, False{})),
+              adc_out_split(31n, xa, ya, True{})))))
+
+# The other half of the bridge: a limb's sum. evmword.add computes each limb as
+# U32.add(U32.add(a,i), carry), which is the 32-bit adc with that carry in.
+law limb_sum_is_adc:
+  for +xa: Word(32n)
+  for +ya: Word(32n)
+  for c: Bool
+  {U32.add(U32.add(U32{xa}, U32{ya}), L.bit(c))
+    == U32{Word.adc(32n, xa, ya, False{}, c)} : U32}
+def limb_sum_is_adc(xa, ya, c):
+  match c:
+    case False{}:
+      Equal.cong(Word(32n), U32, w => U32{w},
+        Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+        Word.adc(32n, xa, ya, False{}, False{}),
+        Equal.sym(Word(32n),
+          Word.adc(32n, xa, ya, False{}, False{}),
+          Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,False{})),
+          adc_is_add_carry(32n, xa, ya, False{})))
+    case True{}:
+      Equal.cong(Word(32n), U32, w => U32{w},
+        Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+        Word.adc(32n, xa, ya, False{}, True{}),
+        Equal.sym(Word(32n),
+          Word.adc(32n, xa, ya, False{}, True{}),
+          Word.add(32n, Word.add(32n,xa,ya), carry_word(32n,True{})),
+          adc_is_add_carry(32n, xa, ya, True{})))
+
+# --- Step 5 feasibility ----------------------------------------------------
+# The split lemma instantiated at the first limb boundary. The 256-bit terms do
+# not strain the checker (90ms), so the remaining seven instantiations are
+# mechanical rather than blocked.
+law concat_adc_32_224:
+  for +lo1: Word(32n)
+  for +lo2: Word(32n)
+  for +hi1: Word(224n)
+  for +hi2: Word(224n)
+  {Word.adc(256n, Spec.concat(32n,224n,lo1,hi1), Spec.concat(32n,224n,lo2,hi2), False{}, False{})
+    == Spec.concat(32n, 224n, Word.adc(32n,lo1,lo2,False{},False{}),
+         Word.adc(224n,hi1,hi2,False{},adc_out(32n,lo1,lo2,False{},False{})))
+    : Word(256n)}
+def concat_adc_32_224(lo1, lo2, hi1, hi2):
+  concat_adc(32n, 224n, lo1, lo2, hi1, hi2, False{})
+
+# --- What is left ----------------------------------------------------------
+# The theorem itself:
+#   for x,y: L.Word.  of_limbs(L.add(x,y)) == Spec.add(of_limbs x, of_limbs y)
+#
+# Everything it rests on is proved above. What remains is assembly:
+#   - seven more instantiations of concat_adc down of_limbs' nesting
+#     (32/224, 32/192, ... 32/0), threading adc_out as each carry;
+#   - matching L.add's explicit c0..c6 chain to that threaded carry using
+#     carry_is_adc_out, and each limb's value using limb_sum_is_adc;
+#   - limb 0 is `U32.add(a,i)` with no carry argument, so it needs
+#     `U32.add(u, 0) == u` rather than limb_sum_is_adc;
+#   - discarding the eighth carry, which is what makes the arithmetic modular.
