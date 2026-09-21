@@ -86,23 +86,39 @@ to `True{}` when `growth` is `0n` (sound -- pushing nothing cannot overflow),
 and for `growth >= 1` let laws take the bound as a hypothesis, the way
 `stack-proof.bend` already threads `evidence`.
 
-### B2 -- Storage is unreachable
+### B2 -- Symbolic storage values  [DIAGNOSED, NARROWER THAN ASSUMED]
 
-SSTORE laws fail two ways: at gas 5,000 normalization sticks on an unreduced
-`world.lookup(Account.storage(world.find(...)))`; at gas >= 15,000 the checker
-blows its JS stack. Gas magnitude alone is not the cause -- the stack laws check
-fine at 200,000 gas. It is the state-gas/reservoir path plus the
-association-list world.
+The original reading -- "storage is unreachable" -- was wrong, and
+`full/storage-laws.bend` now carries the counterexamples:
 
-Fix, in two parts:
-- Give `world.find`/`world.lookup` reduction lemmas, or replace the association
-  list with a structure that reduces on symbolic keys.
-- Get unary `Nat` gas out of the state path for proofs. Standard move: a
-  gas-erased `step` variant plus a theorem that it agrees with the real `step`
-  whenever gas suffices. Avoids rewriting gas accounting.
+- `sstore_zero_over_zero` -- SSTORE through the full Machine interpreter.
+- `sstore_writes_value` -- SSTORE at **200,000 execution gas**, zero to
+  nonzero, spending the full 97,920 of Amsterdam state gas out of the
+  reservoir. Large unary gas is not by itself a barrier.
+- `tstore_symbolic` -- TSTORE lands **any** word in transient slot 0,
+  universally quantified over the value.
 
-This is the blocker that matters. Nearly every contract property worth stating
-is about storage.
+What actually blocks is narrow. `state-ops.state_if` and `state-ops.refund`
+branch on `W.is_zero(value)` and `W.eq(current,value)`. For a symbolic word
+those predicates never reduce, so the match stays stuck, so the checker
+normalizes *every* branch -- including `G.spend_state(e, U32.to_nat(97920))`
+and `G.refill(e, U32.to_nat(97920))` -- and the composed unary arithmetic
+overflows the JavaScript call stack.
+
+Isolated by four probes: concrete value at 30k gas passes; concrete value at
+200k gas passes; symbolic value at 30k gas overflows; symbolic value through
+TSTORE (which has no value-dependent branch) passes.
+
+Fix: hoist those predicates into parameters, the way `opcodes.enough` and
+`opcodes.room` already take their decision as a Bool, so a law can supply the
+case split instead of the interpreter forcing it. A local refactor of
+`state-ops.bend`, comparable in size to B1 -- not the world-structure and
+gas-erasure surgery originally planned. `world.find` is already structural and
+reduces fine; no lemmas needed there.
+
+Bend has no computed match (`match f(x)` is unsupported), so the case split
+must go through a helper def that takes the Bool plus its evidence. That idiom
+is already used throughout `opcodes.bend`.
 
 ### B3 -- Arithmetic laws are unanchored
 
@@ -138,9 +154,14 @@ before anything is proposed upstream.
 
 1. ~~**B1** -- structural underflow guard + `has_is_length` equivalence law.~~
    **Done.**
-2. **B5** -- stand up the conformance suite so B2's larger surgery is checkable.
-3. **B2a** -- world lookup reduction lemmas.
-4. **B2b** -- gas-erased `step` and its agreement theorem.
+2. ~~**B5** -- stand up the conformance suite.~~ **Fast net done**: 624/624
+   differential on both backends, precompiles, frame invariants and contract
+   fixtures all green with B1 applied. See `LOCAL-SETUP.md`. The 15,918-fixture
+   state gate needs a 2.57 GB corpus and hours; still open, required before
+   anything goes upstream.
+3. **B2** -- hoist the value-dependent predicates in `state-ops.bend`.
+4. ~~**B2b** -- gas-erased `step`.~~ **Not needed.** Unary gas at 200,000
+   normalizes fine; the overflow came from stuck branches, not gas size.
 5. **B3** -- limb refinement, upstreamable as a standalone PR against
    `word-spec.bend`.
 6. First real contract spec end to end; then B4 if the ceiling binds.
