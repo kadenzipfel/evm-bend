@@ -137,7 +137,7 @@ Bend has no computed match (`match f(x)` is unsupported), so the case split
 must go through a helper def that takes the Bool plus its evidence. That idiom
 is already used throughout `opcodes.bend`.
 
-### B3 -- Arithmetic laws are unanchored  [4 of 5 lemmas proved]
+### B3 -- Arithmetic laws are unanchored  [all 5 lemmas proved; assembly left]
 
 `word-spec.bend` carries two word types: `L.Word` (8 x U32 limbs, what runs) and
 `Word256` (`Word(256n)` bitvector, what is provable), with `of_limbs` between
@@ -166,18 +166,24 @@ all generic in the word width:
   instantiated at the tail's comparison, which sidesteps Bend's lack of a
   computed match.
 
-**Open: lemma 4b**, carry composition --
-`adc_out(x,y,c) == or(adc_out(x,y,F), adc_out(add(x,y), carry_word(c), F))`.
-True because a two-step addition cannot overflow twice. The `c = False` half
-follows from `adc_out_zero_right`. The `c = True` half does not yield to a
-direct induction: the second `adc_out`'s carry chain runs over the bits of
-`add(x,y)`, not over x and y, so the hypothesis is about the wrong word. It
-needs a generalisation carrying both chains at once.
+- **Lemma 4b** -- `adc_out_split`, carry composition: a two-step addition cannot
+  overflow twice. A direct induction fails because the second carry chain runs
+  over the bits of `add(x,y)`, not over x and y. Carrying both chains at once,
+  indexed by the three joint carry states reachable (`a = b or g`, never both),
+  makes it go through. Stated at width `1n+n`: at width zero it is false, since
+  a 0-bit `add(x,y)` cannot represent the carry the increment would produce.
 
-After that, step 5 is bookkeeping: `U32.add` is `U32{Word.add(32n,·,·)}` by
-definition and `L.bit(c)` is the U32 whose word is `carry_word(32n,c)`, so the
-lemmas specialise to `L.carry` directly; then seven instantiations of
-`concat_adc` over `of_limbs`' nesting, discarding the 256th carry.
+**The bridge to the running code is also proved.** `carry_is_adc_out` shows
+`evmword.carry` -- the two `U32.is_lt` tests the interpreter actually runs -- IS
+the bitvector carry out. `limb_sum_is_adc` shows a limb's value is the 32-bit
+adc. Both need a case split on the carry bit, since `evmword.bit` is a stuck
+match on a symbolic Bool and blocks `U32.add` from unfolding.
+
+**Left: assembly only.** Seven more `concat_adc` instantiations down
+`of_limbs`' nesting, matching `L.add`'s explicit c0..c6 chain to the threaded
+carry, `U32.add(u,0) == u` for limb 0, and discarding the eighth carry. A
+feasibility probe instantiates `concat_adc` at 32/224 in 90ms, so the 256-bit
+terms do not strain the checker.
 
 ### B4 -- Program size ceiling
 
@@ -206,8 +212,10 @@ before anything is proposed upstream.
    probably an upstream conversation. Deprioritized below B3.
 4. ~~**B2b** -- gas-erased `step`.~~ **Not needed.** Unary gas at 200,000
    normalizes fine; the overflow came from stuck branches, not gas size.
-5. **B3** -- limb refinement, upstreamable as a standalone PR against
-   `word-spec.bend`.
+5. **B3** -- limb refinement. All five lemmas and both bridge halves proved in
+   `word-refine.bend` (15 laws, 100ms). Assembly remains. Upstreamable as a
+   standalone PR: additive, touches no interpreter code, closes a gap the
+   author flagged himself.
 6. First real contract spec end to end; then B4 if the ceiling binds.
 
 ## Non-goals
