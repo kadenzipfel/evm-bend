@@ -137,7 +137,7 @@ Bend has no computed match (`match f(x)` is unsupported), so the case split
 must go through a helper def that takes the Bool plus its evidence. That idiom
 is already used throughout `opcodes.bend`.
 
-### B3 -- Arithmetic laws are unanchored
+### B3 -- Arithmetic laws are unanchored  [4 of 5 lemmas proved]
 
 `word-spec.bend` carries two word types: `L.Word` (8 x U32 limbs, what runs) and
 `Word256` (`Word(256n)` bitvector, what is provable), with `of_limbs` between
@@ -149,9 +149,35 @@ is explicitly OUTSTANDING upstream, with a 5-lemma plan in a comment. Until it
 closes, a law about ADD's result is only as strong as `L.add`, which is tied to
 nothing. `word-proof.low_add` proves the low 32 bits only.
 
-Lemmas 1 and 4 of that plan ("generalized bitvector adc returning result and
-final carry", "final carry equals the overflow comparison") are the same
-carry-generalized induction over `Word.adc` used in `../u256/m3_sub_add.bend`.
+`word-refine.bend` now carries 10 proved laws covering four of the five steps,
+all generic in the word width:
+
+- **Lemma 1** -- `adc_out`, the final carry of `Word.adc`, with `carry_bit`
+  proved to agree with the second component of `Bool.full_add`.
+- **Lemma 2** -- `concat_adc`: adding two concatenated bitvectors is the low add
+  followed by the high add started from the low add's carry out. This is the
+  lemma that turns one 256-bit add into eight 32-bit adds.
+- **Lemma 3** -- `adc_is_add_carry`: a carry-in is a second addition. Routed
+  through `adc_zero_right`, `adc_carry_is_inc` and `add_one_is_inc`.
+- **Lemma 4a** -- `adc_out_is_cmp`: the carry out IS the unsigned overflow
+  comparison. Generalising over the carry-in is what makes it true -- without a
+  carry-in the wrapped sum is strictly below x on overflow, with one it is at
+  most x. The per-bit step (`fin_shift`) is proved over a quantified `Cmp`, then
+  instantiated at the tail's comparison, which sidesteps Bend's lack of a
+  computed match.
+
+**Open: lemma 4b**, carry composition --
+`adc_out(x,y,c) == or(adc_out(x,y,F), adc_out(add(x,y), carry_word(c), F))`.
+True because a two-step addition cannot overflow twice. The `c = False` half
+follows from `adc_out_zero_right`. The `c = True` half does not yield to a
+direct induction: the second `adc_out`'s carry chain runs over the bits of
+`add(x,y)`, not over x and y, so the hypothesis is about the wrong word. It
+needs a generalisation carrying both chains at once.
+
+After that, step 5 is bookkeeping: `U32.add` is `U32{Word.add(32n,·,·)}` by
+definition and `L.bit(c)` is the U32 whose word is `carry_word(32n,c)`, so the
+lemmas specialise to `L.carry` directly; then seven instantiations of
+`concat_adc` over `of_limbs`' nesting, discarding the 256th carry.
 
 ### B4 -- Program size ceiling
 

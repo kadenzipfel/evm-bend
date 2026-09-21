@@ -239,3 +239,176 @@ def adc_is_add_carry(n, x, y, c):
           Word.add(n, Word.add(n,x,y), carry_word(n,True{})),
           Word.inc(n, Word.add(n,x,y)),
           add_one_is_inc(n, Word.add(n,x,y))))
+
+# --- Lemma 4: the carry out is an unsigned overflow comparison --------------
+# `evmword.carry` decides the limb carry with two U32.is_lt tests. Tying that to
+# `adc_out` needs the carry out expressed as a comparison. The clean statement
+# generalises over the carry in: without one the wrapped sum is strictly below
+# x on overflow, with one it is at most x.
+
+def sum_bit(a: Bool, b: Bool, c: Bool) -> Bool:
+  match a b c:
+    case False{} False{} False{}: False{}
+    case False{} False{} True{}: True{}
+    case False{} True{} False{}: True{}
+    case False{} True{} True{}: False{}
+    case True{} False{} False{}: True{}
+    case True{} False{} True{}: False{}
+    case True{} True{} False{}: False{}
+    case True{} True{} True{}: True{}
+
+def lt_or_eq(c: Bool, k: Cmp) -> Bool:
+  match c:
+    case False{}: Cmp.is_lt(k)
+    case True{}: Cmp.is_le(k)
+
+# The per-bit step, over an arbitrary tail comparison. K is a quantified
+# variable here, not a computed term, so it can be matched directly -- Bend has
+# no computed match. The main induction instantiates this at the tail's cmp.
+law fin_shift:
+  for xb: Bool
+  for yb: Bool
+  for c: Bool
+  for K: Cmp
+  {lt_or_eq(carry_bit(xb,yb,c), K)
+    == lt_or_eq(c, Word.cmp.fin(sum_bit(xb,yb,c), xb, K)) : Bool}
+def fin_shift(xb, yb, c, K):
+  match xb yb c K:
+        case False{} False{} False{} LT{}: {==}
+        case False{} False{} False{} EQ{}: {==}
+        case False{} False{} False{} GT{}: {==}
+        case False{} False{} True{} LT{}: {==}
+        case False{} False{} True{} EQ{}: {==}
+        case False{} False{} True{} GT{}: {==}
+        case False{} True{} False{} LT{}: {==}
+        case False{} True{} False{} EQ{}: {==}
+        case False{} True{} False{} GT{}: {==}
+        case False{} True{} True{} LT{}: {==}
+        case False{} True{} True{} EQ{}: {==}
+        case False{} True{} True{} GT{}: {==}
+        case True{} False{} False{} LT{}: {==}
+        case True{} False{} False{} EQ{}: {==}
+        case True{} False{} False{} GT{}: {==}
+        case True{} False{} True{} LT{}: {==}
+        case True{} False{} True{} EQ{}: {==}
+        case True{} False{} True{} GT{}: {==}
+        case True{} True{} False{} LT{}: {==}
+        case True{} True{} False{} EQ{}: {==}
+        case True{} True{} False{} GT{}: {==}
+        case True{} True{} True{} LT{}: {==}
+        case True{} True{} True{} EQ{}: {==}
+        case True{} True{} True{} GT{}: {==}
+
+law adc_out_is_cmp:
+  for +n: Nat
+  for +x: Word(n)
+  for +y: Word(n)
+  for c: Bool
+  {adc_out(n,x,y,False{},c)
+    == lt_or_eq(c, Word.cmp(n, Word.adc(n,x,y,False{},c), x)) : Bool}
+def adc_out_is_cmp(n, x, y, c):
+  match n:
+    case 0n:
+      match x y c:
+        case WNil{} WNil{} False{}: {==}
+        case WNil{} WNil{} True{}: {==}
+    case 1n+p:
+      match x y c:
+        case WCon{False{},+xt} WCon{False{},+yt} False{}:
+          Equal.trans(Bool,
+            adc_out(p,xt,yt,False{},False{}),
+            lt_or_eq(False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt)),
+            lt_or_eq(False{}, Word.cmp.fin(False{}, False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt))),
+            adc_out_is_cmp(p,xt,yt,False{}),
+            fin_shift(False{}, False{}, False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt)))
+        case WCon{False{},+xt} WCon{False{},+yt} True{}:
+          Equal.trans(Bool,
+            adc_out(p,xt,yt,False{},False{}),
+            lt_or_eq(False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt)),
+            lt_or_eq(True{}, Word.cmp.fin(True{}, False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt))),
+            adc_out_is_cmp(p,xt,yt,False{}),
+            fin_shift(False{}, False{}, True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt)))
+        case WCon{False{},+xt} WCon{True{},+yt} False{}:
+          Equal.trans(Bool,
+            adc_out(p,xt,yt,False{},False{}),
+            lt_or_eq(False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt)),
+            lt_or_eq(False{}, Word.cmp.fin(True{}, False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt))),
+            adc_out_is_cmp(p,xt,yt,False{}),
+            fin_shift(False{}, True{}, False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt)))
+        case WCon{False{},+xt} WCon{True{},+yt} True{}:
+          Equal.trans(Bool,
+            adc_out(p,xt,yt,False{},True{}),
+            lt_or_eq(True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt)),
+            lt_or_eq(True{}, Word.cmp.fin(False{}, False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt))),
+            adc_out_is_cmp(p,xt,yt,True{}),
+            fin_shift(False{}, True{}, True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt)))
+        case WCon{True{},+xt} WCon{False{},+yt} False{}:
+          Equal.trans(Bool,
+            adc_out(p,xt,yt,False{},False{}),
+            lt_or_eq(False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt)),
+            lt_or_eq(False{}, Word.cmp.fin(True{}, True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt))),
+            adc_out_is_cmp(p,xt,yt,False{}),
+            fin_shift(True{}, False{}, False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},False{}), xt)))
+        case WCon{True{},+xt} WCon{False{},+yt} True{}:
+          Equal.trans(Bool,
+            adc_out(p,xt,yt,False{},True{}),
+            lt_or_eq(True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt)),
+            lt_or_eq(True{}, Word.cmp.fin(False{}, True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt))),
+            adc_out_is_cmp(p,xt,yt,True{}),
+            fin_shift(True{}, False{}, True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt)))
+        case WCon{True{},+xt} WCon{True{},+yt} False{}:
+          Equal.trans(Bool,
+            adc_out(p,xt,yt,False{},True{}),
+            lt_or_eq(True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt)),
+            lt_or_eq(False{}, Word.cmp.fin(False{}, True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt))),
+            adc_out_is_cmp(p,xt,yt,True{}),
+            fin_shift(True{}, True{}, False{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt)))
+        case WCon{True{},+xt} WCon{True{},+yt} True{}:
+          Equal.trans(Bool,
+            adc_out(p,xt,yt,False{},True{}),
+            lt_or_eq(True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt)),
+            lt_or_eq(True{}, Word.cmp.fin(True{}, True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt))),
+            adc_out_is_cmp(p,xt,yt,True{}),
+            fin_shift(True{}, True{}, True{}, Word.cmp(p, Word.adc(p,xt,yt,False{},True{}), xt)))
+
+# Adding zero never carries. Needed by the carry-composition step below.
+law adc_out_zero_right:
+  for n: Nat
+  for u: Word(n)
+  {adc_out(n, u, Word.zero(n), False{}, False{}) == False{} : Bool}
+def adc_out_zero_right(n, u):
+  match n:
+    case 0n:
+      match u:
+        case WNil{}: {==}
+    case 1n+p:
+      match u:
+        case WCon{False{},t}: adc_out_zero_right(p,t)
+        case WCon{True{},t}: adc_out_zero_right(p,t)
+
+# --- REMAINING (lemma 4b and step 5) ---------------------------------------
+#
+# `evmword.carry` decides a limb carry as
+#   or(is_lt(add(x,y), x), is_lt(add(add(x,y),cin), add(x,y)))
+# so tying it to adc_out needs carry composition:
+#
+#   law adc_out_split:
+#     for n, x, y, c
+#     {adc_out(n,x,y,False{},c)
+#       == Bool.or(adc_out(n,x,y,False{},False{}),
+#                  adc_out(n, Word.add(n,x,y), carry_word(n,c), False{}, False{}))
+#       : Bool}
+#
+# True because a two-step addition cannot overflow twice. The `c = False{}`
+# half follows from adc_out_zero_right above plus `Bool.or(b, False{}) == b`.
+# The `c = True{}` half is the open work: a direct induction does not go
+# through, because the second adc_out's carry chain runs over the bits of
+# `add(n,x,y)` rather than over x and y, so the induction hypothesis is about
+# the wrong word. It needs a generalisation that carries both chains at once.
+#
+# With adc_out_split in hand the rest is bookkeeping:
+#   - bridge U32 to Word(32n): U32.add(a,b) is U32{Word.add(32n,·,·)} by
+#     definition, and L.bit(c) is the U32 whose word is carry_word(32n,c), so
+#     adc_is_add_carry and adc_out_split specialise to L.carry directly;
+#   - instantiate concat_adc seven times over of_limbs' nesting and discard the
+#     256th carry, which is step 5 and is mechanical.
