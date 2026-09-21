@@ -722,3 +722,488 @@ def concat_adc_32_224(lo1, lo2, hi1, hi2):
 #   - limb 0 is `U32.add(a,i)` with no carry argument, so it needs
 #     `U32.add(u, 0) == u` rather than limb_sum_is_adc;
 #   - discarding the eighth carry, which is what makes the arithmetic modular.
+
+# --- Step 5a: one 256-bit add is eight 32-bit adds --------------------------
+# concat_adc instantiated down of_limbs' nesting: 256 = 32+224, 224 = 32+192,
+# ... 32 = 32+0. The eighth carry is discarded for free -- the last level's high
+# half is Word.adc(0n, WNil, WNil, ...), which is WNil. That is what makes the
+# arithmetic modular.
+
+law add_splits_into_limbs:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +x5: Word(32n)
+  for +x6: Word(32n)
+  for +x7: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  for +y5: Word(32n)
+  for +y6: Word(32n)
+  for +y7: Word(32n)
+  {Word.add(256n,Spec.concat(32n,224n,x0,Spec.concat(32n,192n,x1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))))))),Spec.concat(32n,224n,y0,Spec.concat(32n,192n,y1,Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))))))) == Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})))))))) : Word(256n)}
+def add_splits_into_limbs(x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, y6, y7):
+Equal.trans(Word(256n),
+  Word.adc(256n,Spec.concat(32n,224n,x0,Spec.concat(32n,192n,x1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))))))),Spec.concat(32n,224n,y0,Spec.concat(32n,192n,y1,Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))))))),False{},False{}),
+  Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Word.adc(224n,Spec.concat(32n,192n,x1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))))))),Spec.concat(32n,192n,y1,Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))))),False{},adc_out(32n,x0,y0,False{},False{}))),
+  Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})))))))),
+  concat_adc(32n,224n,x0,y0,Spec.concat(32n,192n,x1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))))))),Spec.concat(32n,192n,y1,Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))))),False{}),
+  Equal.cong(Word(224n), Word(256n), w => Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),w),
+    Word.adc(224n,Spec.concat(32n,192n,x1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))))))),Spec.concat(32n,192n,y1,Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))))),False{},adc_out(32n,x0,y0,False{},False{})),
+    Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))),
+    Equal.trans(Word(224n),
+  Word.adc(224n,Spec.concat(32n,192n,x1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))))))),Spec.concat(32n,192n,y1,Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))))),False{},adc_out(32n,x0,y0,False{},False{})),
+  Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Word.adc(192n,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))))),Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))))),False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),
+  Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))),
+  concat_adc(32n,192n,x1,y1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))))),Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))))),adc_out(32n,x0,y0,False{},False{})),
+  Equal.cong(Word(192n), Word(224n), w => Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),w),
+    Word.adc(192n,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))))),Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))))),False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),
+    Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})))))),
+    Equal.trans(Word(192n),
+  Word.adc(192n,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))))),Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))))),False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),
+  Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Word.adc(160n,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))))),Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))),False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),
+  Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})))))),
+  concat_adc(32n,160n,x2,y2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))))),Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))),adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),
+  Equal.cong(Word(160n), Word(192n), w => Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),w),
+    Word.adc(160n,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))))),Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))),False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),
+    Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))),
+    Equal.trans(Word(160n),
+  Word.adc(160n,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))))),Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))),False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),
+  Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Word.adc(128n,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))),Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))),False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),
+  Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))),
+  concat_adc(32n,128n,x3,y3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))),Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))),adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),
+  Equal.cong(Word(128n), Word(160n), w => Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),w),
+    Word.adc(128n,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))),Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))),False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),
+    Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})))),
+    Equal.trans(Word(128n),
+  Word.adc(128n,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))),Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})))),False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),
+  Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Word.adc(96n,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))),Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))),False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),
+  Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})))),
+  concat_adc(32n,96n,x4,y4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))),Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))),adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),
+  Equal.cong(Word(96n), Word(128n), w => Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),w),
+    Word.adc(96n,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))),Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))),False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),
+    Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))),
+    Equal.trans(Word(96n),
+  Word.adc(96n,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{}))),Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))),False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),
+  Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Word.adc(64n,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})),Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})),False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),
+  Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))),
+  concat_adc(32n,64n,x5,y5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})),Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})),adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),
+  Equal.cong(Word(64n), Word(96n), w => Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),w),
+    Word.adc(64n,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})),Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})),False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),
+    Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})),
+    Equal.trans(Word(64n),
+  Word.adc(64n,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})),Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{})),False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),
+  Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Word.adc(32n,Spec.concat(32n,0n,x7,WNil{}),Spec.concat(32n,0n,y7,WNil{}),False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))))),
+  Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})),
+  concat_adc(32n,32n,x6,y6,Spec.concat(32n,0n,x7,WNil{}),Spec.concat(32n,0n,y7,WNil{}),adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),
+  Equal.cong(Word(32n), Word(64n), w => Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),w),
+    Word.adc(32n,Spec.concat(32n,0n,x7,WNil{}),Spec.concat(32n,0n,y7,WNil{}),False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),
+    Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}),
+    concat_adc(32n,0n,x7,y7,WNil{},WNil{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))))))))))))))))))
+
+# --- Step 5b: evmword's carry chain is the adc_out chain -------------------
+
+law carry_chain0:
+  for +x0: Word(32n)
+  for +y0: Word(32n)
+  {L.carry(U32{x0},U32{y0},0) == L.bit(adc_out(32n,x0,y0,False{},False{})) : U32}
+def carry_chain0(x0, y0):
+  carry_is_adc_out(x0, y0, False{})
+
+law carry_chain1:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  {L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)) == L.bit(adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))) : U32}
+def carry_chain1(x0, x1, y0, y1):
+  Equal.trans(U32,
+    L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)),
+    L.carry(U32{x1},U32{y1},L.bit(adc_out(32n,x0,y0,False{},False{}))),
+    L.bit(adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),
+    Equal.cong(U32, U32, u => L.carry(U32{x1},U32{y1},u),
+      L.carry(U32{x0},U32{y0},0), L.bit(adc_out(32n,x0,y0,False{},False{})), carry_chain0(x0, y0)),
+    carry_is_adc_out(x1, y1, adc_out(32n,x0,y0,False{},False{})))
+
+law carry_chain2:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  {L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))) == L.bit(adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))) : U32}
+def carry_chain2(x0, x1, x2, y0, y1, y2):
+  Equal.trans(U32,
+    L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),
+    L.carry(U32{x2},U32{y2},L.bit(adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),
+    L.bit(adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),
+    Equal.cong(U32, U32, u => L.carry(U32{x2},U32{y2},u),
+      L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)), L.bit(adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))), carry_chain1(x0, x1, y0, y1)),
+    carry_is_adc_out(x2, y2, adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))
+
+law carry_chain3:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  {L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))) == L.bit(adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))) : U32}
+def carry_chain3(x0, x1, x2, x3, y0, y1, y2, y3):
+  Equal.trans(U32,
+    L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),
+    L.carry(U32{x3},U32{y3},L.bit(adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),
+    L.bit(adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),
+    Equal.cong(U32, U32, u => L.carry(U32{x3},U32{y3},u),
+      L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))), L.bit(adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))), carry_chain2(x0, x1, x2, y0, y1, y2)),
+    carry_is_adc_out(x3, y3, adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))
+
+law carry_chain4:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  {L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))) == L.bit(adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))) : U32}
+def carry_chain4(x0, x1, x2, x3, x4, y0, y1, y2, y3, y4):
+  Equal.trans(U32,
+    L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),
+    L.carry(U32{x4},U32{y4},L.bit(adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),
+    L.bit(adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),
+    Equal.cong(U32, U32, u => L.carry(U32{x4},U32{y4},u),
+      L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))), L.bit(adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))), carry_chain3(x0, x1, x2, x3, y0, y1, y2, y3)),
+    carry_is_adc_out(x4, y4, adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))
+
+law carry_chain5:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +x5: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  for +y5: Word(32n)
+  {L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))) == L.bit(adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))) : U32}
+def carry_chain5(x0, x1, x2, x3, x4, x5, y0, y1, y2, y3, y4, y5):
+  Equal.trans(U32,
+    L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),
+    L.carry(U32{x5},U32{y5},L.bit(adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),
+    L.bit(adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),
+    Equal.cong(U32, U32, u => L.carry(U32{x5},U32{y5},u),
+      L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))), L.bit(adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))), carry_chain4(x0, x1, x2, x3, x4, y0, y1, y2, y3, y4)),
+    carry_is_adc_out(x5, y5, adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))
+
+law carry_chain6:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +x5: Word(32n)
+  for +x6: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  for +y5: Word(32n)
+  for +y6: Word(32n)
+  {L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))) == L.bit(adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))) : U32}
+def carry_chain6(x0, x1, x2, x3, x4, x5, x6, y0, y1, y2, y3, y4, y5, y6):
+  Equal.trans(U32,
+    L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),
+    L.carry(U32{x6},U32{y6},L.bit(adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),
+    L.bit(adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),
+    Equal.cong(U32, U32, u => L.carry(U32{x6},U32{y6},u),
+      L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))), L.bit(adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))), carry_chain5(x0, x1, x2, x3, x4, x5, y0, y1, y2, y3, y4, y5)),
+    carry_is_adc_out(x6, y6, adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))))
+
+# --- Step 5b: each limb's value is the 32-bit adc --------------------------
+
+law limb_val0:
+  for +x0: Word(32n)
+  for +y0: Word(32n)
+  {U32.add(U32{x0},U32{y0}) == U32{Word.adc(32n,x0,y0,False{},False{})} : U32}
+def limb_val0(x0, y0):
+  {==}
+
+law limb_val1:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  {U32.add(U32.add(U32{x1},U32{y1}),L.carry(U32{x0},U32{y0},0)) == U32{Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))} : U32}
+def limb_val1(x0, x1, y0, y1):
+  Equal.trans(U32,
+    U32.add(U32.add(U32{x1},U32{y1}),L.carry(U32{x0},U32{y0},0)),
+    U32.add(U32.add(U32{x1},U32{y1}),L.bit(adc_out(32n,x0,y0,False{},False{}))),
+    U32{Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))},
+    Equal.cong(U32, U32, u => U32.add(U32.add(U32{x1},U32{y1}),u),
+      L.carry(U32{x0},U32{y0},0), L.bit(adc_out(32n,x0,y0,False{},False{})), carry_chain0(x0, y0)),
+    limb_sum_is_adc(x1, y1, adc_out(32n,x0,y0,False{},False{})))
+
+law limb_val2:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  {U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))) == U32{Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))} : U32}
+def limb_val2(x0, x1, x2, y0, y1, y2):
+  Equal.trans(U32,
+    U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),
+    U32.add(U32.add(U32{x2},U32{y2}),L.bit(adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),
+    U32{Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))},
+    Equal.cong(U32, U32, u => U32.add(U32.add(U32{x2},U32{y2}),u),
+      L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)), L.bit(adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))), carry_chain1(x0, x1, y0, y1)),
+    limb_sum_is_adc(x2, y2, adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))
+
+law limb_val3:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  {U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))) == U32{Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))} : U32}
+def limb_val3(x0, x1, x2, x3, y0, y1, y2, y3):
+  Equal.trans(U32,
+    U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),
+    U32.add(U32.add(U32{x3},U32{y3}),L.bit(adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),
+    U32{Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))},
+    Equal.cong(U32, U32, u => U32.add(U32.add(U32{x3},U32{y3}),u),
+      L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))), L.bit(adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))), carry_chain2(x0, x1, x2, y0, y1, y2)),
+    limb_sum_is_adc(x3, y3, adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))
+
+law limb_val4:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  {U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))) == U32{Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))} : U32}
+def limb_val4(x0, x1, x2, x3, x4, y0, y1, y2, y3, y4):
+  Equal.trans(U32,
+    U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),
+    U32.add(U32.add(U32{x4},U32{y4}),L.bit(adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),
+    U32{Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))},
+    Equal.cong(U32, U32, u => U32.add(U32.add(U32{x4},U32{y4}),u),
+      L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))), L.bit(adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))), carry_chain3(x0, x1, x2, x3, y0, y1, y2, y3)),
+    limb_sum_is_adc(x4, y4, adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))
+
+law limb_val5:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +x5: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  for +y5: Word(32n)
+  {U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))) == U32{Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))} : U32}
+def limb_val5(x0, x1, x2, x3, x4, x5, y0, y1, y2, y3, y4, y5):
+  Equal.trans(U32,
+    U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),
+    U32.add(U32.add(U32{x5},U32{y5}),L.bit(adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),
+    U32{Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))},
+    Equal.cong(U32, U32, u => U32.add(U32.add(U32{x5},U32{y5}),u),
+      L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))), L.bit(adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))), carry_chain4(x0, x1, x2, x3, x4, y0, y1, y2, y3, y4)),
+    limb_sum_is_adc(x5, y5, adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))
+
+law limb_val6:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +x5: Word(32n)
+  for +x6: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  for +y5: Word(32n)
+  for +y6: Word(32n)
+  {U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))) == U32{Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))} : U32}
+def limb_val6(x0, x1, x2, x3, x4, x5, x6, y0, y1, y2, y3, y4, y5, y6):
+  Equal.trans(U32,
+    U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),
+    U32.add(U32.add(U32{x6},U32{y6}),L.bit(adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),
+    U32{Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))},
+    Equal.cong(U32, U32, u => U32.add(U32.add(U32{x6},U32{y6}),u),
+      L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))), L.bit(adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))), carry_chain5(x0, x1, x2, x3, x4, x5, y0, y1, y2, y3, y4, y5)),
+    limb_sum_is_adc(x6, y6, adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))))
+
+law limb_val7:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +x5: Word(32n)
+  for +x6: Word(32n)
+  for +x7: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  for +y5: Word(32n)
+  for +y6: Word(32n)
+  for +y7: Word(32n)
+  {U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))) == U32{Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))))} : U32}
+def limb_val7(x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, y6, y7):
+  Equal.trans(U32,
+    U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),
+    U32.add(U32.add(U32{x7},U32{y7}),L.bit(adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))))),
+    U32{Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))))},
+    Equal.cong(U32, U32, u => U32.add(U32.add(U32{x7},U32{y7}),u),
+      L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))), L.bit(adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))), carry_chain6(x0, x1, x2, x3, x4, x5, x6, y0, y1, y2, y3, y4, y5, y6)),
+    limb_sum_is_adc(x7, y7, adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))))
+
+# --- THE THEOREM ------------------------------------------------------------
+# The limb representation refines the bitvector spec for addition: mapping the
+# eight-U32 word into a 256-bit bitvector commutes with adding. This is the
+# claim word-spec.bend records as OUTSTANDING.
+
+law of_limbs_add:
+  for +x0: Word(32n)
+  for +x1: Word(32n)
+  for +x2: Word(32n)
+  for +x3: Word(32n)
+  for +x4: Word(32n)
+  for +x5: Word(32n)
+  for +x6: Word(32n)
+  for +x7: Word(32n)
+  for +y0: Word(32n)
+  for +y1: Word(32n)
+  for +y2: Word(32n)
+  for +y3: Word(32n)
+  for +y4: Word(32n)
+  for +y5: Word(32n)
+  for +y6: Word(32n)
+  for +y7: Word(32n)
+  {Spec.of_limbs(L.add(L.W{U32{x0},U32{x1},U32{x2},U32{x3},U32{x4},U32{x5},U32{x6},U32{x7}}, L.W{U32{y0},U32{y1},U32{y2},U32{y3},U32{y4},U32{y5},U32{y6},U32{y7}}))
+    == Spec.add(Spec.of_limbs(L.W{U32{x0},U32{x1},U32{x2},U32{x3},U32{x4},U32{x5},U32{x6},U32{x7}}), Spec.of_limbs(L.W{U32{y0},U32{y1},U32{y2},U32{y3},U32{y4},U32{y5},U32{y6},U32{y7}})) : Spec.Word256}
+def of_limbs_add(x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, y6, y7):
+  Equal.trans(Spec.Word256,
+    Spec.of_limbs(L.add(L.W{U32{x0},U32{x1},U32{x2},U32{x3},U32{x4},U32{x5},U32{x6},U32{x7}}, L.W{U32{y0},U32{y1},U32{y2},U32{y3},U32{y4},U32{y5},U32{y6},U32{y7}})),
+    Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))))},
+    Spec.add(Spec.of_limbs(L.W{U32{x0},U32{x1},U32{x2},U32{x3},U32{x4},U32{x5},U32{x6},U32{x7}}), Spec.of_limbs(L.W{U32{y0},U32{y1},U32{y2},U32{y3},U32{y4},U32{y5},U32{y6},U32{y7}})),
+    Equal.trans(Spec.Word256,
+  Spec.Bits{Spec.prepend(224n,U32.add(U32{x0},U32{y0}),Spec.prepend(192n,U32.add(U32.add(U32{x1},U32{y1}),L.carry(U32{x0},U32{y0},0)),Spec.prepend(160n,U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.prepend(192n,U32.add(U32.add(U32{x1},U32{y1}),L.carry(U32{x0},U32{y0},0)),Spec.prepend(160n,U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))))},
+  Equal.cong(U32, Spec.Word256, u => Spec.Bits{Spec.prepend(224n,u,Spec.prepend(192n,U32.add(U32.add(U32{x1},U32{y1}),L.carry(U32{x0},U32{y0},0)),Spec.prepend(160n,U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  U32.add(U32{x0},U32{y0}), U32{Word.adc(32n,x0,y0,False{},False{})}, limb_val0(x0, y0)),
+  Equal.trans(Spec.Word256,
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.prepend(192n,U32.add(U32.add(U32{x1},U32{y1}),L.carry(U32{x0},U32{y0},0)),Spec.prepend(160n,U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.prepend(160n,U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))))},
+  Equal.cong(U32, Spec.Word256, u => Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.prepend(192n,u,Spec.prepend(160n,U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  U32.add(U32.add(U32{x1},U32{y1}),L.carry(U32{x0},U32{y0},0)), U32{Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))}, limb_val1(x0, x1, y0, y1)),
+  Equal.trans(Spec.Word256,
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.prepend(160n,U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))))},
+  Equal.cong(U32, Spec.Word256, u => Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.prepend(160n,u,Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  U32.add(U32.add(U32{x2},U32{y2}),L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))), U32{Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))}, limb_val2(x0, x1, x2, y0, y1, y2)),
+  Equal.trans(Spec.Word256,
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.prepend(128n,U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))))},
+  Equal.cong(U32, Spec.Word256, u => Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.prepend(128n,u,Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  U32.add(U32.add(U32{x3},U32{y3}),L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))), U32{Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))}, limb_val3(x0, x1, x2, x3, y0, y1, y2, y3)),
+  Equal.trans(Spec.Word256,
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.prepend(96n,U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))))},
+  Equal.cong(U32, Spec.Word256, u => Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.prepend(96n,u,Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  U32.add(U32.add(U32{x4},U32{y4}),L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))), U32{Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))}, limb_val4(x0, x1, x2, x3, x4, y0, y1, y2, y3, y4)),
+  Equal.trans(Spec.Word256,
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.prepend(64n,U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))))},
+  Equal.cong(U32, Spec.Word256, u => Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.prepend(64n,u,Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  U32.add(U32.add(U32{x5},U32{y5}),L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))), U32{Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))}, limb_val5(x0, x1, x2, x3, x4, x5, y0, y1, y2, y3, y4, y5)),
+  Equal.trans(Spec.Word256,
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.prepend(32n,U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{}))))))))},
+  Equal.cong(U32, Spec.Word256, u => Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.prepend(32n,u,Spec.prepend(0n,U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))),WNil{}))))))))},
+  U32.add(U32.add(U32{x6},U32{y6}),L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0))))))), U32{Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))}, limb_val6(x0, x1, x2, x3, x4, x5, x6, y0, y1, y2, y3, y4, y5, y6)),
+  Equal.cong(U32, Spec.Word256, u => Spec.Bits{Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.prepend(0n,u,WNil{}))))))))},
+  U32.add(U32.add(U32{x7},U32{y7}),L.carry(U32{x6},U32{y6},L.carry(U32{x5},U32{y5},L.carry(U32{x4},U32{y4},L.carry(U32{x3},U32{y3},L.carry(U32{x2},U32{y2},L.carry(U32{x1},U32{y1},L.carry(U32{x0},U32{y0},0)))))))), U32{Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))))}, limb_val7(x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, y6, y7))))))))),
+    Equal.cong(Word(256n), Spec.Word256, w => Spec.Bits{w},
+  Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})))))))),
+  Word.add(256n,Spec.concat(32n,224n,x0,Spec.concat(32n,192n,x1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))))))),Spec.concat(32n,224n,y0,Spec.concat(32n,192n,y1,Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))))))),
+  Equal.sym(Word(256n), Word.add(256n,Spec.concat(32n,224n,x0,Spec.concat(32n,192n,x1,Spec.concat(32n,160n,x2,Spec.concat(32n,128n,x3,Spec.concat(32n,96n,x4,Spec.concat(32n,64n,x5,Spec.concat(32n,32n,x6,Spec.concat(32n,0n,x7,WNil{})))))))),Spec.concat(32n,224n,y0,Spec.concat(32n,192n,y1,Spec.concat(32n,160n,y2,Spec.concat(32n,128n,y3,Spec.concat(32n,96n,y4,Spec.concat(32n,64n,y5,Spec.concat(32n,32n,y6,Spec.concat(32n,0n,y7,WNil{}))))))))), Spec.concat(32n,224n,Word.adc(32n,x0,y0,False{},False{}),Spec.concat(32n,192n,Word.adc(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})),Spec.concat(32n,160n,Word.adc(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))),Spec.concat(32n,128n,Word.adc(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))),Spec.concat(32n,96n,Word.adc(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))),Spec.concat(32n,64n,Word.adc(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))),Spec.concat(32n,32n,Word.adc(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{}))))))),Spec.concat(32n,0n,Word.adc(32n,x7,y7,False{},adc_out(32n,x6,y6,False{},adc_out(32n,x5,y5,False{},adc_out(32n,x4,y4,False{},adc_out(32n,x3,y3,False{},adc_out(32n,x2,y2,False{},adc_out(32n,x1,y1,False{},adc_out(32n,x0,y0,False{},False{})))))))),WNil{})))))))),
+    add_splits_into_limbs(x0, x1, x2, x3, x4, x5, x6, x7, y0, y1, y2, y3, y4, y5, y6, y7))))
+
+# The same claim over arbitrary limbs, and then over arbitrary limb words --
+# the form word-spec.bend states as outstanding. Split in two because a match
+# may not scrutinise a field bound by an enclosing match.
+law of_limbs_add_limbs:
+  for +a0: U32
+  for +a1: U32
+  for +a2: U32
+  for +a3: U32
+  for +a4: U32
+  for +a5: U32
+  for +a6: U32
+  for +a7: U32
+  for +b0: U32
+  for +b1: U32
+  for +b2: U32
+  for +b3: U32
+  for +b4: U32
+  for +b5: U32
+  for +b6: U32
+  for +b7: U32
+  {Spec.of_limbs(L.add(L.W{a0,a1,a2,a3,a4,a5,a6,a7}, L.W{b0,b1,b2,b3,b4,b5,b6,b7}))
+    == Spec.add(Spec.of_limbs(L.W{a0,a1,a2,a3,a4,a5,a6,a7}), Spec.of_limbs(L.W{b0,b1,b2,b3,b4,b5,b6,b7})) : Spec.Word256}
+def of_limbs_add_limbs(a0,a1,a2,a3,a4,a5,a6,a7,b0,b1,b2,b3,b4,b5,b6,b7):
+  match a0 a1 a2 a3 a4 a5 a6 a7 b0 b1 b2 b3 b4 b5 b6 b7:
+    case U32{x0} U32{x1} U32{x2} U32{x3} U32{x4} U32{x5} U32{x6} U32{x7}
+             U32{y0} U32{y1} U32{y2} U32{y3} U32{y4} U32{y5} U32{y6} U32{y7}:
+      of_limbs_add(x0,x1,x2,x3,x4,x5,x6,x7,y0,y1,y2,y3,y4,y5,y6,y7)
+
+law of_limbs_add_word:
+  for +x: L.Word
+  for +y: L.Word
+  {Spec.of_limbs(L.add(x,y)) == Spec.add(Spec.of_limbs(x), Spec.of_limbs(y))
+    : Spec.Word256}
+def of_limbs_add_word(x, y):
+  match x y:
+    case L.W{a0,a1,a2,a3,a4,a5,a6,a7} L.W{b0,b1,b2,b3,b4,b5,b6,b7}:
+      of_limbs_add_limbs(a0,a1,a2,a3,a4,a5,a6,a7,b0,b1,b2,b3,b4,b5,b6,b7)

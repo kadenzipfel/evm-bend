@@ -48,14 +48,14 @@ law zero_representation:
 def zero_representation():
   {==}
 
-# OUTSTANDING, deliberately not declared as an open law:
-# for x,y:L.Word, of_limbs(L.add(x,y)) == add(of_limbs(x),of_limbs(y)).
-# Needed bridge lemmas:
-# 1. Generalized bitvector adc returning both its low result and final carry.
-# 2. adc concatenation: addition over concatenated bitvectors splits into
-#    low adc and high adc supplied with the low final carry (arbitrary carry-in).
-# 3. A 32-bit adc result equals U32.add(U32.add(x,y),cin), cin in {0,1}.
-# 4. Final carry equals (sum(x,y)<x) OR (sum(sum(x,y),cin)<sum(x,y)).
-#    This needs unsigned comparison/overflow and carry-composition lemmas.
-# 5. Instantiate the split lemma seven times; discard the 256th carry.
-# add_comm proves only this reference's commutativity, not L.add's refinement.
+# CLOSED. The refinement theorem
+#   for x,y: L.Word, of_limbs(L.add(x,y)) == add(of_limbs(x),of_limbs(y))
+# is proved in ./word-refine.bend as `of_limbs_add_word`, generically in the
+# word width where the lemmas allow it. The five bridge lemmas this comment
+# used to list are `adc_out` + `carry_bit_is_full_add` (1), `concat_adc` (2),
+# `adc_is_add_carry` (3), `adc_out_is_cmp` (4a) and `adc_out_split` (4b), with
+# `carry_is_adc_out` and `limb_sum_is_adc` tying them to L.carry and L.add, and
+# `add_splits_into_limbs` doing the seven instantiations of (5).
+#
+# add_comm below still proves only this reference's commutativity. With the
+# refinement in hand it now transfers to L.add.

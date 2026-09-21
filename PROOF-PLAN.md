@@ -137,7 +137,7 @@ Bend has no computed match (`match f(x)` is unsupported), so the case split
 must go through a helper def that takes the Bool plus its evidence. That idiom
 is already used throughout `opcodes.bend`.
 
-### B3 -- Arithmetic laws are unanchored  [all 5 lemmas proved; assembly left]
+### B3 -- Arithmetic laws are unanchored  [CLOSED]
 
 `word-spec.bend` carries two word types: `L.Word` (8 x U32 limbs, what runs) and
 `Word256` (`Word(256n)` bitvector, what is provable), with `of_limbs` between
@@ -179,11 +179,21 @@ the bitvector carry out. `limb_sum_is_adc` shows a limb's value is the 32-bit
 adc. Both need a case split on the carry bit, since `evmword.bit` is a stuck
 match on a symbolic Bool and blocks `U32.add` from unfolding.
 
-**Left: assembly only.** Seven more `concat_adc` instantiations down
-`of_limbs`' nesting, matching `L.add`'s explicit c0..c6 chain to the threaded
-carry, `U32.add(u,0) == u` for limb 0, and discarding the eighth carry. A
-feasibility probe instantiates `concat_adc` at 32/224 in 90ms, so the 256-bit
-terms do not strain the checker.
+**The theorem is proved.** `of_limbs_add_word` in `word-refine.bend`:
+
+    for x,y: L.Word.  of_limbs(L.add(x,y)) == add(of_limbs x, of_limbs y)
+
+35 laws, 1,209 lines, checking in 650ms. The assembly went through
+`add_splits_into_limbs` (eight `concat_adc` instantiations down `of_limbs`'
+nesting, 256 = 32+224 ... 32 = 32+0), `carry_chain0..6` (evmword's c0..c6 chain
+is the `adc_out` chain) and `limb_val0..7` (each limb's value is the 32-bit
+adc). The eighth carry is discarded for free: the last level's high half is
+`Word.adc(0n, WNil, WNil, ...)`, which is `WNil`. That is what makes the
+arithmetic modular.
+
+A negative control -- replacing the conclusion with `of_limbs(x)` -- is
+rejected, so the proof is not vacuous. `word-spec.bend`'s OUTSTANDING comment
+has been replaced with a pointer to the proof.
 
 ### B4 -- Program size ceiling
 
@@ -212,10 +222,9 @@ before anything is proposed upstream.
    probably an upstream conversation. Deprioritized below B3.
 4. ~~**B2b** -- gas-erased `step`.~~ **Not needed.** Unary gas at 200,000
    normalizes fine; the overflow came from stuck branches, not gas size.
-5. **B3** -- limb refinement. All five lemmas and both bridge halves proved in
-   `word-refine.bend` (15 laws, 100ms). Assembly remains. Upstreamable as a
-   standalone PR: additive, touches no interpreter code, closes a gap the
-   author flagged himself.
+5. ~~**B3** -- limb refinement.~~ **Done.** `word-refine.bend`, 35 laws.
+   Upstreamable as a standalone PR: additive, touches no interpreter code,
+   closes a gap the author flagged himself in a code comment.
 6. First real contract spec end to end; then B4 if the ceiling binds.
 
 ## Non-goals
