@@ -450,10 +450,10 @@ def room(ok: Bool,+op: U32,f: M.Frame,c: M.Context) -> M.Frame:
 def enough(ok: Bool,+op: U32,+f: M.Frame,c: M.Context) -> M.Frame:
   match ok:
     case False{}: M.fault(f,2)
-    case True{}: room(Nat.is_le(Nat.add(List.length(&2,W.Word,M.Frame.stack(f)),growth(op)),1024n),op,f,c)
+    case True{}: room(H.capacity(growth(op),M.Frame.stack(f)),op,f,c)
 
 def dispatch(+op: U32,+f: M.Frame,c: M.Context) -> M.Frame:
-  enough(Nat.is_ge(List.length(&2,W.Word,M.Frame.stack(f)),required(op)),op,f,c)
+  enough(H.has(required(op),M.Frame.stack(f)),op,f,c)
 
 def active(a: M.Action,+f: M.Frame,c: M.Context) -> M.Frame:
   match a:

@@ -46,7 +46,7 @@ boxing, and `full/main.bend` checks on the stock toolchain.
 
 ## Blockers
 
-### B1 -- Symbolic stack depth is impossible  [IN PROGRESS]
+### B1 -- Symbolic stack depth is impossible  [DONE]
 
 `full/opcodes.dispatch` guards underflow numerically:
 
@@ -57,8 +57,14 @@ symbolic it never reduces, the guard sticks, and every law over an open stack
 dies in normalization. `core.bend`'s toy laws only work because that
 interpreter matches the stack structurally.
 
-Fix: a structural predicate that decides underflow by walking only as far as it
-must.
+RESOLVED. `H.has` and `H.capacity` in `full/opcode-common.bend` replace both
+numeric guards; `full/guard-laws.bend` proves the replacement correct; and
+`full/stack-laws.bend` carries the first six laws ever stated against `full/`
+-- POP, ADD, SWAP1 and an underflow fault, over an open stack tail and with
+symbolic gas. All 88 local Bend tests are byte-identical to the upstream
+baseline.
+
+The structural predicate:
 
     def has(n: Nat, xs: +List<W.Word>) -> Bool:
       match n:
@@ -130,9 +136,8 @@ before anything is proposed upstream.
 
 ## Order of work
 
-1. **B1** -- structural underflow guard + `has_is_length` equivalence law.
-   Cheapest, local to `opcodes.bend`/`opcode-common.bend`, unblocks every
-   open-stack law.
+1. ~~**B1** -- structural underflow guard + `has_is_length` equivalence law.~~
+   **Done.**
 2. **B5** -- stand up the conformance suite so B2's larger surgery is checkable.
 3. **B2a** -- world lookup reduction lemmas.
 4. **B2b** -- gas-erased `step` and its agreement theorem.

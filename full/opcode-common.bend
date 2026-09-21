@@ -11,6 +11,26 @@ def choose(b: Bool, a: Nat, c: Nat) -> Nat:
     case True{}: a
     case False{}: c
 
+# Structural stack-depth test. Decides underflow by walking only as far as `n`
+# requires, so it reduces on a stack whose tail is an open variable. Equivalent
+# to Nat.is_ge(List.length(xs), n); proved in ./guard-laws.bend.
+def has(n: Nat, +xs: +List<W.Word>) -> Bool:
+  match n:
+    case 0n: True{}
+    case 1n+p:
+      match xs:
+        case Nil{}: False{}
+        case Con{h,+t}: has(p,t)
+
+# Stack-capacity test. An opcode that does not grow the stack cannot breach the
+# 1024 bound on a stack that already respects it, so the zero case answers
+# without forcing the spine. A growing opcode still measures it. See
+# ./guard-laws.bend for the equivalence and for the residual obligation.
+def capacity(g: Nat, +xs: +List<W.Word>) -> Bool:
+  match g:
+    case 0n: True{}
+    case 1n+p: Nat.is_le(Nat.add(List.length(&2,W.Word,xs),1n+p),1024n)
+
 def at(n: Nat, xs: +List<W.Word>) -> W.Word:
   match n:
     case 0n:
