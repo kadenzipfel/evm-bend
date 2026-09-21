@@ -61,21 +61,50 @@ law tstore_symbolic:
 def tstore_symbolic(x):
   {==}
 
-# NOT PROVABLE TODAY -- the precise blocker, recorded so it is not re-diagnosed:
+# NOT PROVABLE TODAY -- the blocker, with the refactor that does NOT fix it, so
+# nobody re-runs this experiment:
 #
 #   law sstore_symbolic:
 #     for x: W.Word
 #     {slot0(run_m(2n, start_stack(x <> Nil{}, [96,0,85], ...))) == x : W.Word}
 #
-# overflows the checker's stack. The cause is NOT gas magnitude (the law above
-# checks at 200,000) and NOT storage itself (TSTORE checks symbolically). It is
-# that `state-ops.state_if` and `state-ops.refund` branch on `W.is_zero(value)`
-# and `W.eq(current,value)`. For a symbolic word those never reduce, the match
-# stays stuck, and the checker then normalizes every branch -- including
-# `G.spend_state(e, U32.to_nat(97920))` and `G.refill(e, U32.to_nat(97920))` --
-# whose composed unary arithmetic blows the JavaScript call stack.
+# overflows the checker's stack. Established by bisection on `store_paid`,
+# calling `state-ops.store` directly so the VM loop is not involved:
 #
-# Fix direction: hoist those predicates into parameters, the way `opcodes.enough`
-# and `opcodes.room` already take their decision as a Bool. A law can then supply
-# the case split instead of the interpreter forcing it. That is a local refactor
-# of state-ops.bend, comparable in size to the guard change in B1.
+#   concrete value                             passes, 0.54s
+#   symbolic value                             overflows
+#   symbolic, all three value-dependent terms
+#     (cost / state_change / refund) stubbed   passes, 0.26s
+#   symbolic, only `refund` left stuck         PASSES
+#   symbolic, only `cost` left stuck           overflows
+#   symbolic, only `state_change` left stuck   overflows
+#   symbolic, any single term stubbed          overflows
+#
+# So it is not storage, not gas magnitude (a concrete write proves out at
+# 200,000 gas and a 97,920 reservoir spend), not the world (`world.find` is
+# structural and reduces), and not the reservoir size (0 / 97,920 / 200,000 all
+# behave alike). The checker is lazy about fields the goal never reads, which is
+# why a stuck `refund` -- it only feeds the world's refund counter -- is
+# survivable on its own.
+#
+# What kills it is a stuck term reaching the GAS path. `cost` contains
+# `choose(Bool.and(untouched, Bool.not(same)), 10000, 0n)`; with `same` stuck the
+# cost is stuck, so `Checked.charge` is stuck, so `G.failed` is stuck, so every
+# `commit` on the way out is a stuck match. The checker then pushes each
+# continuation into every branch, and with several independent stuck predicates
+# nested through `charge`, `state_if`, `refund_if` and two `commit`s the term
+# grows multiplicatively past the JavaScript stack.
+#
+# TRIED AND REJECTED (all reverted; none moved the needle):
+#   1. Hoisting the five slot predicates into shared `+` bindings -- plain CSE,
+#      `W.eq(current,value)` was being recomputed three times. Still overflows:
+#      the checker substitutes rather than sharing.
+#   2. Taking the post-store world from `paid` rather than `funded`, so the
+#      storage read does not pass through the state-gas engine. Still overflows.
+#   3. Collapsing the first `commit` into a `store_commit` helper to remove one
+#      nested stuck match. Still overflows.
+#
+# The real fix has to keep stuck predicates out of the gas decision, which means
+# reshaping how `store_paid` charges -- a redesign of gas-critical code, not a
+# hoist. It should not land without the 15,918-fixture state gate running, and
+# is probably worth raising upstream first.

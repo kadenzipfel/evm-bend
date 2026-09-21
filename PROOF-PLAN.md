@@ -86,7 +86,7 @@ to `True{}` when `growth` is `0n` (sound -- pushing nothing cannot overflow),
 and for `growth >= 1` let laws take the bound as a hypothesis, the way
 `stack-proof.bend` already threads `evidence`.
 
-### B2 -- Symbolic storage values  [DIAGNOSED, NARROWER THAN ASSUMED]
+### B2 -- Symbolic storage values  [BLOCKED: needs a gas-path redesign]
 
 The original reading -- "storage is unreachable" -- was wrong, and
 `full/storage-laws.bend` now carries the counterexamples:
@@ -109,12 +109,29 @@ Isolated by four probes: concrete value at 30k gas passes; concrete value at
 200k gas passes; symbolic value at 30k gas overflows; symbolic value through
 TSTORE (which has no value-dependent branch) passes.
 
-Fix: hoist those predicates into parameters, the way `opcodes.enough` and
-`opcodes.room` already take their decision as a Bool, so a law can supply the
-case split instead of the interpreter forcing it. A local refactor of
-`state-ops.bend`, comparable in size to B1 -- not the world-structure and
-gas-erasure surgery originally planned. `world.find` is already structural and
-reduces fine; no lemmas needed there.
+The hoist proposed here was tried and **does not work**. Three refactors were
+implemented and reverted: sharing the five slot predicates as `+` bindings
+(plain CSE -- the checker substitutes rather than sharing), taking the
+post-store world from `paid` instead of `funded`, and collapsing the first
+`commit` into a helper to drop a nested stuck match. Each still overflows. Full
+bisection evidence is in the comment block at the end of
+`full/storage-laws.bend`.
+
+What the bisection shows: a stuck predicate is survivable when it only reaches
+fields the goal never reads -- with only `refund` left stuck the law passes,
+because the checker is lazy there. It is fatal when it reaches the GAS path.
+`cost` holds `choose(Bool.and(untouched, Bool.not(same)), 10000, 0n)`; a stuck
+`same` makes the cost stuck, hence `Checked.charge` stuck, hence `G.failed`
+stuck, hence every `commit` on the way out a stuck match. The checker pushes
+each continuation into every branch and the term grows multiplicatively past
+the JavaScript stack.
+
+So the fix must keep stuck predicates out of the gas decision, which means
+reshaping how `store_paid` charges. That is a redesign of gas-critical code,
+not a hoist, and it should not land without the 15,918-fixture gate. Worth
+raising upstream before building it.
+
+`world.find` is already structural and needs no lemmas.
 
 Bend has no computed match (`match f(x)` is unsupported), so the case split
 must go through a helper def that takes the Bool plus its evidence. That idiom
@@ -159,7 +176,8 @@ before anything is proposed upstream.
    fixtures all green with B1 applied. See `LOCAL-SETUP.md`. The 15,918-fixture
    state gate needs a 2.57 GB corpus and hours; still open, required before
    anything goes upstream.
-3. **B2** -- hoist the value-dependent predicates in `state-ops.bend`.
+3. **B2** -- blocked pending a gas-path redesign; needs the state gate and
+   probably an upstream conversation. Deprioritized below B3.
 4. ~~**B2b** -- gas-erased `step`.~~ **Not needed.** Unary gas at 200,000
    normalizes fine; the overflow came from stuck branches, not gas size.
 5. **B3** -- limb refinement, upstreamable as a standalone PR against
